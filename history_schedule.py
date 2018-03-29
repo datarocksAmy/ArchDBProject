@@ -83,6 +83,26 @@ def relabel(HTransaction):
     return HTransaction
 
 
+# Check if History has at least 1 conflict
+def conflict_raid(finalHistT):
+    conflict_Case = {
+                1: ["r", "w"],
+                2: ["w", "w"],
+                3: ["w", "r"]
+            }
+    # Different Transaction, Same Data Item, One of them is write
+    for idx in range(1, len(finalHistT)+1):
+        for searchIdx in range(2, len(finalHistT)+1):
+            tempOp = []
+            if (finalHistT[idx-1]['Transaction'] != finalHistT[searchIdx-1]['Transaction']) and \
+                    (finalHistT[idx-1]['Data Item'] == finalHistT[searchIdx-1]['Data Item']):
+                        tempOp.append(finalHistT[idx-1]['Operation'])
+                        tempOp.append(finalHistT[searchIdx-1]['Operation'])
+                        for caseNum in range(1, 4):
+                            if tempOp == conflict_Case.get(caseNum):
+                                return True
+    return False
+
 # Create History JSON with Transactions
 def History_generator(dataItemL, numTransaction, numOperation):
     history = {}
@@ -102,14 +122,8 @@ def History_generator(dataItemL, numTransaction, numOperation):
     # Relabel 'Index'
     finalHistoryT = relabel(historyT)
 
-
     return finalHistoryT
 
-
-
-
-# Check Transaction conflict or not
-#def conflict_raid():
 
 # Prompt user input for num of Data Items & num of Transactions & Max Num of Operation
 # Max size of 4 for Data item and transaction, Max size of 5 for Operation
@@ -121,8 +135,12 @@ numOperation = check_input(3)
 dataItemList = data_item_generator(numDataItem)
 
 # Generate History
-historyyy = History_generator(dataItemList, numTransaction, numOperation)
-print(historyyy)
+flag = False
+while not flag:
+    historyyy = History_generator(dataItemList, numTransaction, numOperation)
+    flag = conflict_raid(historyyy)
+
+
 
 # Dump JSON - History - into text file
 with open("HistoryJSON.txt", 'w') as JSONfile:
