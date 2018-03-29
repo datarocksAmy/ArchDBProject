@@ -1,6 +1,7 @@
 # Libraries
 import json
 import random
+import itertools
 
 
 # Check Data Item and Transaction input type and range
@@ -62,28 +63,48 @@ def operation_generator():
 def JSON_Obj_generator(numOfOperation, TNum, dataItemL):
     transactionList = []
     for idx in range(1, numOfOperation+1):
-        JSON_Obj = '{ ' \
-                   'Index: %d, ' \
-                   'Transaction: %d, ' \
-                   'Data Item: %s, ' \
-                   'Operation: %s, ' \
-                   'IsHistory: False' \
-                   '}'\
-                    % (idx, TNum, random.choice(dataItemL), operation_generator())
+        JSON_Obj = {
+                   "Index": idx,
+                   "Transaction": TNum,
+                   "Data Item": random.choice(dataItemL),
+                   "Operation": operation_generator(),
+                   "IsHistory": "False"
+                   }
         transactionList.append(JSON_Obj)
 
     return transactionList
 
 
+# Relabel Index
+def relabel(HTransaction):
+    for idx in range(1, len(HTransaction) + 1):
+        HTransaction[idx-1]['Index'] = idx
+
+    return HTransaction
+
+
 # Create History JSON with Transactions
 def History_generator(dataItemL, numTransaction, numOperation):
     history = {}
+    chainTransactions = []
+
     for numT in range(1, numTransaction+1):
         transaction = JSON_Obj_generator(numOperation, numT, dataItemL)
         keyT = "T" + str(numT)
         history[keyT] = transaction
+        chainTransactions.append(transaction)
+    # Concat Multiple Lists into 1
+    historyT = list(itertools.chain.from_iterable(chainTransactions))
 
-    return history
+    # Randomly Shuffle order of items
+    random.shuffle(historyT)
+
+    # Relabel 'Index'
+    finalHistoryT = relabel(historyT)
+
+
+    return finalHistoryT
+
 
 
 
@@ -101,6 +122,7 @@ dataItemList = data_item_generator(numDataItem)
 
 # Generate History
 historyyy = History_generator(dataItemList, numTransaction, numOperation)
+print(historyyy)
 
 # Dump JSON - History - into text file
 with open("HistoryJSON.txt", 'w') as JSONfile:
