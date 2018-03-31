@@ -46,7 +46,7 @@ def check_input(param):
 
 # Random Generator : Data Item
 def data_item_generator(numOfDataItem):
-    dataItemList = ["x", "y", "z", "w"]
+    dataItemList = ["x", "y", "z", "v"]
     if numDataItem == 4:
         return dataItemList
     else:
@@ -54,9 +54,15 @@ def data_item_generator(numOfDataItem):
 
 
 # Random Generator : Pick 1 Operation
-def operation_generator():
-    operationList = ["r", "w", "c", "a"]
-    return random.choice(operationList)
+def operation_generator(op):
+    if op == "rw":
+        rw_operationList = ["r", "w"]
+        op_pick = random.choice(rw_operationList)
+    elif op == "ac":
+        ac_operationList = ["c", "a"]
+        op_pick = random.choice(ac_operationList)
+
+    return op_pick
 
 
 # Create JSON Object per Transaction
@@ -67,7 +73,7 @@ def JSON_Obj_generator(numOfOperation, TNum, dataItemL):
                    "Index": idx,
                    "Transaction": TNum,
                    "Data Item": random.choice(dataItemL),
-                   "Operation": operation_generator(),
+                   "Operation": operation_generator("rw"),
                    "IsHistory": "False"
                    }
         transactionList.append(JSON_Obj)
@@ -83,7 +89,7 @@ def relabel(HTransaction):
     return HTransaction
 
 
-# Check if History has at least 1 conflict
+# Check if History has at least 1 conflict2
 def conflict_raid(finalHistT):
     conflict_Case = {
                 1: ["r", "w"],
@@ -102,6 +108,7 @@ def conflict_raid(finalHistT):
                             if tempOp == conflict_Case.get(caseNum):
                                 return True
     return False
+
 
 # Create History JSON with Transactions
 def History_generator(dataItemL, numTransaction, numOperation):
@@ -122,6 +129,14 @@ def History_generator(dataItemL, numTransaction, numOperation):
     # Relabel 'Index'
     finalHistoryT = relabel(historyT)
 
+    # Put in commit and abort for each transaction
+    countNumT = 1
+    while countNumT <= numTransaction:
+        for numT_count in range(1, len(finalHistoryT)):
+            if finalHistoryT[-numT_count]['Transaction'] == countNumT:
+                finalHistoryT[-numT_count]['Operation'] = operation_generator("ac")
+                countNumT += 1
+
     return finalHistoryT
 
 
@@ -135,11 +150,12 @@ numOperation = check_input(3)
 dataItemList = data_item_generator(numDataItem)
 
 # Generate History
-flag = False
-while not flag:
-    historyyy = History_generator(dataItemList, numTransaction, numOperation)
-    flag = conflict_raid(historyyy)
+historyyy = History_generator(dataItemList, numTransaction, numOperation)
 
+# Check if there's at least one conflict in the history or not
+# If not, generate a history again
+while conflict_raid(historyyy):
+    historyyy = History_generator(dataItemList, numTransaction, numOperation)
 
 
 # Dump JSON - History - into text file
