@@ -74,7 +74,6 @@ def JSON_Obj_generator(numOfOperation, TNum, dataItemL):
                    "Transaction": TNum,
                    "Data Item": random.choice(dataItemL),
                    "Operation": operation_generator("rw"),
-                   "IsHistory": "False"
                    }
         transactionList.append(JSON_Obj)
 
@@ -109,18 +108,33 @@ def conflict_raid(finalHistT):
                                 return True
     return False
 
+# Check if # of Data Item is correct
+def dataItem_raid(finalHistT, numOfDataItem):
+    dataItem_check = []
+    # Different Transaction, Same Data Item, One of them is write
+    for idx in range(0, len(finalHistT)):
+        if finalHistT[idx]['Data Item'] not in dataItem_check:
+            dataItem_check.append(finalHistT[idx]['Data Item'])
+
+    if len(dataItem_check) == numOfDataItem:
+        return True
+    else:
+        return False
+
 
 # Create History JSON with Transactions
 def History_generator(dataItemL, numTransaction, numOperation):
     history = {}
     chainTransactions = []
     countNumT = []
+    dataItemCheck = []
 
     for numT in range(1, numTransaction+1):
         transaction = JSON_Obj_generator(numOperation, numT, dataItemL)
         keyT = "T" + str(numT)
         history[keyT] = transaction
         chainTransactions.append(transaction)
+
     # Concat Multiple Lists into 1
     historyT = list(itertools.chain.from_iterable(chainTransactions))
 
@@ -132,19 +146,17 @@ def History_generator(dataItemL, numTransaction, numOperation):
 
     # Put in commit and abort for each transaction
     for numT_count in range(1, len(finalHistoryT)+1):
-        if finalHistoryT[-numT_count]['Transaction'] not in countNumT:
+        if finalHistoryT[-numT_count]['Transaction'] not in countNumT and finalHistoryT[-numT_count]['Data Item'] not in dataItemCheck:
             countNumT.append(finalHistoryT[-numT_count]['Transaction'])
+            dataItemCheck.append(finalHistoryT[-numT_count]['Data Item'])
             finalHistoryT[-numT_count]['Operation'] = operation_generator("ac")
+            finalHistoryT[-numT_count]['Data Item'] = ""
 
-
-    # Label IsHistroy to True
-    for flipIdx in range(0, len(finalHistoryT)):
-        finalHistoryT[flipIdx]['IsHistory'] = "True"
 
     return finalHistoryT
 
 
-# Determine Serializability
+# Determine 'Serializability'
 def serializability_pat(finalHistT):
     conflict_Case = {
                 1: ["r", "w"],
@@ -184,7 +196,7 @@ def AC_order(finalHistT):
     return ac_order_list
 
 
-# Determine RC or not
+# Determine 'RC'
 def RC_mate(finalHistT):
     abort_commit_dataI = []
     for pivot in range(0, len(finalHistT)):
@@ -213,6 +225,57 @@ def RC_mate(finalHistT):
         return "NRC"
 
 
+# Check Read/Write Operation after Commit
+def wr_check_after_commmit(finalHistT, commitIdx, TDataItemDict, startNum, endNum):
+    for wr_after in range(startNum, endNum):
+        # Check if there's r or w operation after commit
+        if finalHistT[wr_after]['Operation'] == 'w' or finalHistT[wr_after]['Operation'] == 'r':
+            for key, val in TDataItemDict.items():
+                # Different transaction but operate on the same data item AFTER commit
+                if finalHistT[wr_after]['Transaction'] != key and finalHistT[wr_after]['Data Item'] == val:
+                    return "Strict"
+        else:
+            return "Not Strict"
+
+
+# Determine 'Strict'
+def Strict_eh(finalHistT):
+    commitIdx = []
+    T_DataItem = {}
+
+    for cIdx in range(0, len(finalHistT)):
+        if finalHistT[cIdx]['Operation'] == 'c':
+            commitIdx.append(cIdx)
+            if finalHistT[cIdx]['Transaction'] in commitIdx:
+                T_DataItem[finalHistT[cIdx]['Transaction']].append(finalHistT[cIdx]['Data Item'])
+            else:
+                T_DataItem[finalHistT[cIdx]['Transaction']] = [finalHistT[cIdx]['Data Item']]
+
+    # Num of Commit in CommitIdx List
+    lenCommitIdx = len(commitIdx)
+    # No commit operation --> Not Strict
+    if lenCommitIdx == 0 or commitIdx[-1] == len(finalHistT)-1:
+        return "Not Strict"
+
+    else:
+        # Check if there's w or r after commit
+
+        # Only 1 Commit
+        if lenCommitIdx == 1:
+            strict_verdict = wr_check_after_commmit(finalHistT, commitIdx, T_DataItem, commitIdx[0]+1, len(finalHistT))
+            return strict_verdict
+
+        # 2+ Commit
+        else:
+            for multipleCommitIdx in range(0, lenCommitIdx):
+                if multipleCommitIdx != lenCommitIdx and commitIdx[multipleCommitIdx] != len(finalHistT):
+                    strict_verdict = wr_check_after_commmit(finalHistT, commitIdx, T_DataItem, commitIdx[multipleCommitIdx] + 1, commitIdx[multipleCommitIdx+1])
+                    return strict_verdict
+
+                else:
+                    strict_verdict = wr_check_after_commmit(finalHistT, commitIdx, T_DataItem, commitIdx[multipleCommitIdx] + 1, len(finalHistT))
+                return strict_verdict
+
 
 # Prompt user input for num of Data Items & num of Transactions & Max Num of Operation
 # Max size of 4 for Data item and transaction, Max size of 5 for Operation
@@ -227,9 +290,9 @@ dataItemList = data_item_generator(numDataItem)
 historyyy = History_generator(dataItemList, numTransaction, numOperation)
 
 
-# Check if there's at least one conflict in the history or not
+# Check if there's at least one conflict in the history or not AND # of data item is correct
 # If not, generate a history again
-while conflict_raid(historyyy):
+while conflict_raid(historyyy) and dataItem_raid(historyyy, numDataItem):
     historyyy = History_generator(dataItemList, numTransaction, numOperation)
 
 
@@ -242,6 +305,10 @@ with open("HistoryJSON.txt", 'w') as JSONfile:
 serializability = serializability_pat(historyyy)
 print(serializability)
 
+# Recoverable or not
+recoverable = RC_mate(historyyy)
+print(recoverable)
 
-test = RC_mate(historyyy)
-print(test)
+# Strict or not
+strict = Strict_eh(historyyy)
+print(strict)
