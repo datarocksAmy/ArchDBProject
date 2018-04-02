@@ -181,9 +181,9 @@ def serializability_pat(finalHistT):
 
     if (len(conflict_Order[1]) == len(conflict_Order[2]) and len(conflict_Order[2]) == len(conflict_Order[3]) and len(conflict_Order[1]) == len(conflict_Order[3])) and \
             ((conflict_Order[1] == conflict_Order[2]) and (conflict_Order[2] == conflict_Order[3]) and (conflict_Order[1] == conflict_Order[3])):
-        return True
+        return "Serializable"
     else:
-        return False
+        return "Not Serializable"
 
 # Get the Transaction order for abort and commit
 def AC_order(finalHistT):
@@ -239,7 +239,7 @@ def wr_check_after_commmit(finalHistT, commitIdx, TDataItemDict, startNum, endNu
 
 
 # Determine 'Strict'
-def Strict_eh(finalHistT):
+def strict_eh(finalHistT):
     commitIdx = []
     T_DataItem = {}
 
@@ -253,6 +253,7 @@ def Strict_eh(finalHistT):
 
     # Num of Commit in CommitIdx List
     lenCommitIdx = len(commitIdx)
+
     # No commit operation --> Not Strict
     if lenCommitIdx == 0 or commitIdx[-1] == len(finalHistT)-1:
         return "Not Strict"
@@ -277,6 +278,58 @@ def Strict_eh(finalHistT):
                 return strict_verdict
 
 
+# Check Read Operation after Commit
+def r_check_after_commmit(finalHistT, commitIndex, startNum, endNum):
+    for r_after in range(startNum, endNum):
+        for item in range(0, len(commitIndex)):
+            # Check if there's r after commit
+            if finalHistT[r_after]['Operation'] == 'r':
+                # Read from a committed transaction or not
+                if finalHistT[r_after]['Transaction'] != commitIndex[item][0]:
+                        return "ACA"
+    return "Not ACA"
+
+
+# Determine 'ACA' : Must read from a committed transaction
+def ACA_huh(finalHistT):
+    CI_List = []
+    for findC in range(0, len(finalHistT)):
+        commit_index = []
+        if finalHistT[findC]['Operation'] == 'c':
+            commit_index.append(finalHistT[findC]['Transaction'])
+            commit_index.append(findC)
+
+            CI_List.append(commit_index)
+
+    numCommit = len(CI_List)
+
+    if numCommit == 0:
+        return "Not ACA"
+
+    # 1 Commit
+    elif numCommit == 1:
+        if CI_List[0][1] != len(finalHistT):
+            # Search for read operation and see if it's reading from a committed transaction
+            ACA_result = r_check_after_commmit(finalHistT, CI_List, CI_List[numCommit-1][1]+1, len(finalHistT))
+            return ACA_result
+
+        else:
+            return "Not ACA"
+
+    # 2+ Commit
+    else:
+            for multipleCommitIdx in range(2, numCommit):
+                if CI_List[multipleCommitIdx][1] != len(finalHistT) and multipleCommitIdx != numCommit:
+                    ACA_result = r_check_after_commmit(finalHistT, CI_List, CI_List[multipleCommitIdx-1][1]+1, CI_List[multipleCommitIdx][1])
+                    return ACA_result
+
+                elif CI_List[multipleCommitIdx][1] != len(finalHistT):
+                    ACA_result = wr_check_after_commmit(finalHistT, CI_List, CI_List[multipleCommitIdx][1] + 1, len(finalHistT))
+                    return ACA_result
+                else:
+                    return "Not ACA"
+
+# ---------------------------------------------------- Main ----------------------------------------------------
 # Prompt user input for num of Data Items & num of Transactions & Max Num of Operation
 # Max size of 4 for Data item and transaction, Max size of 5 for Operation
 numDataItem = check_input(1)
@@ -310,5 +363,9 @@ recoverable = RC_mate(historyyy)
 print(recoverable)
 
 # Strict or not
-strict = Strict_eh(historyyy)
+strict = strict_eh(historyyy)
 print(strict)
+
+# ACA or not
+ACA = ACA_huh(historyyy)
+print(ACA)
